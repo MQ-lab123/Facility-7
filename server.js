@@ -22,7 +22,12 @@ const MAP_COUNT = 10;            // MAPS.length in the client (indexes 0..9)
 const MAX_PAYLOAD = 128 * 1024;  // ws default is 100 MB
 const MAX_ENEMIES = 400;
 const RESPAWN_MIN_MS = 2500;     // client waits 3 s before asking to respawn
+// Optional origin allow-list (comma separated). EMPTY = every origin is accepted (default).
+// Pages opened from a local .html file send the literal origin "null": add `null` to the list
+// (or set ALLOW_NULL_ORIGIN=1) if you restrict origins and still want local copies to connect.
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+const ALLOW_NULL_ORIGIN = process.env.ALLOW_NULL_ORIGIN === '1';
+const STARTED_AT = Date.now();
 
 // Mirrors the client's weapon table (the `W` array incl. the W.push(...) armory).
 // rng = client max range. If you change weapon stats in the client, update this too.
@@ -88,6 +93,7 @@ class Player {
   constructor(ws) {
     this.ws = ws;
     this.id = newId();
+    this.createdAt = Date.now();
     this.name = 'OPERATIVE';
     this.room = null;
     this.ready = false;
@@ -110,6 +116,12 @@ class Player {
     this.lastStateAt = 0; this.badStates = 0; this.slots = {};
     this.lastDamagedAt = 0; this.diedAt = 0; this.lastRespawnAt = Date.now();
   }
+}
+
+// Errors carry a machine-readable `code` next to the human `msg` (old clients ignore `code`).
+function sendError(p, code, msg) {
+  log(`rejected ${code} from ${p.id} (${p.name}): ${msg}`);
+  safeSend(p.ws, { t: 'error', code, msg });
 }
 
 function safeSend(ws, data) {
@@ -141,7 +153,14 @@ function leaveRoom(p) {
 }
 
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  // CORS-open, read-only status endpoints (no player data) so any page can wake/probe the server.
+  const url = String(req.url || '/').split('?')[0];
+  if (url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ ok: true, uptime: Math.round((Date.now() - STARTED_AT) / 1000), rooms: rooms.size, clients: wss.clients.size }));
+    return;
+  }
+  res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
   res.end('FACILITY 7 multiplayer server is running.\n');
 });
 
@@ -149,8 +168,12 @@ const wss = new WebSocketServer({
   server,
   maxPayload: MAX_PAYLOAD,
   verifyClient: (info) => {
-    if (!ALLOWED_ORIGINS.length) return true;
-    return ALLOWED_ORIGINS.includes(info.origin);
+    const origin = info.origin || '(none)';
+    if (!ALLOWED_ORIGINS.length) { log(`upgrade accepted, origin=${origin}`); return true; }
+    const ok = ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(info.origin) ||
+      (ALLOW_NULL_ORIGIN && info.origin === 'null');
+    log(ok ? `upgrade accepted, origin=${origin}` : `upgrade REJECTED (origin not in ALLOWED_ORIGINS), origin=${origin}`);
+    return ok;
   },
 });
 
@@ -159,7 +182,7 @@ wss.on('connection', (ws, req) => {
   const p = new Player(ws);
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
-  log(`connection opened: ${p.id} from ${req.socket.remoteAddress}`);
+  log(`connection opened: ${p.id} from ${req.socket.remoteAddress} origin=${req.headers.origin || '(none)'} clients=${wss.clients.size}`);
 
   ws.on('message', (raw) => {
     // token bucket: ~150 msgs/s sustained, burst 300; excess is dropped
@@ -171,13 +194,13 @@ wss.on('connection', (ws, req) => {
 
     let msg;
     try { msg = JSON.parse(raw); }
-    catch (err) { log(`malformed JSON from ${p.id}, ignoring`); return; }
+    catch (err) { log(`malformed JSON from ${p.id}, ignoring`); sendError(p, 'BAD_MESSAGE', 'Malformed message.'); return; }
     if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return;
     try { handle(p, msg); }
     catch (err) { log(`error handling '${msg.t}' from ${p.id}:`, err && err.stack || err); }
   });
 
-  ws.on('close', () => { log(`connection closed: ${p.id}`); leaveRoom(p); });
+  ws.on('close', (code, reason) => { log(`connection closed: ${p.id} code=${code} reason=${String(reason || '') || '(none)'} lived=${Math.round((Date.now() - p.createdAt) / 1000)}s`); leaveRoom(p); });
   ws.on('error', (err) => { log(`socket error for ${p.id}:`, err.message); });
 });
 
@@ -206,10 +229,10 @@ function handle(p, msg) {
       break;
     }
     case 'create': {
-      if (p.room) { safeSend(p.ws, { t: 'error', msg: 'Already in a room.' }); return; }
+      if (p.room) { sendError(p, 'ALREADY_IN_ROOM', 'Already in a room.'); return; }
       const nm = cleanName(msg.name); if (nm) p.name = nm;
       if (rooms.size >= MAX_ROOMS) {
-        safeSend(p.ws, { t: 'error', msg: 'Server is full — too many active rooms. Try again shortly.' });
+        sendError(p, 'SERVER_FULL', 'Server is full — too many active rooms. Try again shortly.');
         return;
       }
       let code = roomCode();
@@ -224,13 +247,15 @@ function handle(p, msg) {
       break;
     }
     case 'join': {
-      if (p.room) { safeSend(p.ws, { t: 'error', msg: 'Already in a room.' }); return; }
+      if (p.room) { sendError(p, 'ALREADY_IN_ROOM', 'Already in a room.'); return; }
       const nm = cleanName(msg.name); if (nm) p.name = nm;
-      const code = String(msg.room || '').toUpperCase().trim();
+      // case-insensitive, tolerant of stray spaces/dashes in a pasted code
+      const code = String(msg.room || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (code.length !== 5) { sendError(p, 'INVALID_CODE', 'Invalid room code.'); return; }
       const room = rooms.get(code);
-      if (!room) { safeSend(p.ws, { t: 'error', msg: 'Room not found.' }); return; }
-      if (room.state !== 'lobby') { safeSend(p.ws, { t: 'error', msg: 'Match already in progress.' }); return; }
-      if (room.players.size >= MAX_PLAYERS_PER_ROOM) { safeSend(p.ws, { t: 'error', msg: 'Room is full.' }); return; }
+      if (!room) { sendError(p, 'ROOM_NOT_FOUND', 'Room not found.'); return; }
+      if (room.state !== 'lobby') { sendError(p, 'MATCH_STARTED', 'Match already in progress.'); return; }
+      if (room.players.size >= MAX_PLAYERS_PER_ROOM) { sendError(p, 'ROOM_FULL', 'Room is full.'); return; }
       room.players.set(p.id, p);
       p.room = room; p.ready = false;
       safeSend(p.ws, { t: 'joined', id: p.id, room: code, isHost: false, players: room.playerList() });
@@ -247,10 +272,10 @@ function handle(p, msg) {
     }
     case 'start': {
       const room = p.room; if (!room) return;
-      if (room.hostId !== p.id) { safeSend(p.ws, { t: 'error', msg: 'Only the host can start the match.' }); return; }
+      if (room.hostId !== p.id) { sendError(p, 'NOT_HOST', 'Only the host can start the match.'); return; }
       if (room.state !== 'lobby') return;
       if ([...room.players.values()].some(q => q.id !== p.id && !q.ready)) {
-        safeSend(p.ws, { t: 'error', msg: 'All players must be ready.' });
+        sendError(p, 'NOT_READY', 'All players must be ready.');
         return;
       }
       const mapId = Number(msg.mapId);
@@ -397,6 +422,7 @@ function handle(p, msg) {
       break;
     }
     default:
+      log(`unknown message type '${String(msg.t).slice(0, 24)}' from ${p.id}`);
       break;
   }
 }
