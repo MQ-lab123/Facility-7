@@ -127,12 +127,18 @@ There is nothing else to configure — no database, no API keys, no `.env` file 
   are all logged with timestamps to stdout — on Render these show up in the service's Logs
   tab.
 
-## Testing note
+## Revision notes (hardening pass)
 
-I wrote and syntax-checked this server, and separately verified the core combat-validation
-logic (damage clamping, fire-rate limiting, kill credit, rejecting hits on dead players) by
-running it in isolation with fake connections. I could not install the `ws` package or open
-a real WebSocket connection in the environment I wrote this in — there's no network access
-at all, not even to the npm registry — so the actual network layer is untested by me. Test
-it locally first (above) before deploying, and expect to do some real debugging once real
-browsers are involved, which is normal for a first pass at networked code.
+- `startMatch` now carries `mode` (`coop`/`pvp`); before, every match silently became co-op.
+- Weapon table now covers all 12 client weapons (ak12, scar, vec, aa12, usp, fiveseven were missing, so their PvP hits were discarded). Pellet weapons may send one `hit` per pellet within one fire-rate window.
+- `hit` is PvP-only, rejects self-hits, and checks shooter/target distance against the weapon range using the last positions received.
+- `respawn` needs a 2.5 s delay; a player recently damaged in PvP cannot heal by respawning.
+- `start` needs every non-host player ready, a valid map id (0-9), and only works once per match.
+- `enemyState` now relays `ev`, `bo` and `alarm` (blackout/mutant events) and sanitises entries; `enemyHit` is co-op only, host-bound, normalised and capped.
+- A socket already in a room cannot create/join another. `ping` is answered with `pong`. `playerLeft` is broadcast.
+- Payloads over 128 KB close the socket; a per-connection message flood bucket drops excess; optional `ALLOWED_ORIGINS` env var (comma-separated) restricts browser origins.
+- Known limit: if the host leaves mid co-op match, the new host's client has no enemy simulation, so enemies stop updating.
+
+## Testing
+
+`npm install && npm test` starts the server on port 3917 and runs 45 checks with real WebSocket clients (rooms, joining, ready/start rules, movement, PvP combat, co-op relay, disconnect/host migration, room isolation, malformed input). It tests this server only, not the browser client and not your Render deployment.
