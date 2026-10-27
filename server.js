@@ -86,6 +86,7 @@ class Room {
     this.mode = 'coop';     // 'coop' | 'pvp'
     this.mapId = 0;
     this.lastEnemyStateAt = 0;
+    this.round = 1; this.roundResetAt = 0; this.roundResetIds = new Set();
   }
   broadcast(msg, exceptId) {
     const s = JSON.stringify(msg);
@@ -276,6 +277,7 @@ function handle(p, msg) {
       room.mapId = Number.isInteger(mapId) && mapId >= 0 && mapId < MAP_COUNT ? mapId : 0;
       room.mode = msg.mode === 'pvp' ? 'pvp' : 'coop';
       room.state = 'match';
+      room.round = 1; room.roundResetAt = 0; room.roundResetIds.clear();
       for (const q of room.players.values()) q.resetForMatch();
       room.broadcast({ t: 'startMatch', mapId: room.mapId, mode: room.mode });
       log(`room ${room.code}: ${room.mode} match started on map ${room.mapId} by host ${p.id}`);
@@ -320,28 +322,37 @@ function handle(p, msg) {
     case 'hit': {
       // The only place player damage is applied. PvP rooms only.
       const room = p.room; if (!room || room.state !== 'match' || room.mode !== 'pvp') return;
+      if (room.roundResetAt) return; // no combat during the post-elimination transition
       if (!p.alive || msg.targetId === p.id) return;
       const target = room.players.get(msg.targetId);
       if (!target || !target.alive) return;
       const key = msg.weapon;
+      const grenade = key === 'grenade';
       const w = Object.prototype.hasOwnProperty.call(WEAPONS, key) ? WEAPONS[key] : null;
-      if (!w) return;
+      if (!w && !grenade) return;
       const now = Date.now();
-      // range sanity using the positions this server last received for both players
+      // Validate grenade splash against server-known player positions; the client supplies only the falloff damage.
       if (p.lastStateAt && target.lastStateAt) {
         const d = Math.hypot(p.x - target.x, p.y - target.y, p.z - target.z);
-        if (d > w.rng * 1.2 + 4) return;
+        if (grenade ? d > 10.5 : d > w.rng * 1.2 + 4) return;
       }
-      if (!allowShot(p, key, w, now)) return;
+      if (grenade) {
+        if (now - (p.lastGrenadeHitAt || 0) < 250) return;
+        p.lastGrenadeHitAt = now;
+      } else if (!allowShot(p, key, w, now)) return;
       let dmg = Number(msg.dmg);
       if (!Number.isFinite(dmg) || dmg <= 0) return;
-      dmg = Math.min(dmg, w.dmg * w.hs * 1.15);
+      dmg = Math.min(dmg, grenade ? 260 : w.dmg * w.hs * 1.15);
       target.hp = Math.max(0, target.hp - dmg);
       target.lastDamagedAt = now;
       if (target.hp <= 0) {
         target.alive = false; target.diedAt = now; p.kills++;
+        room.round += 1;
+        room.roundResetAt = now;
+        room.roundResetIds = new Set(room.players.keys());
         room.broadcast({ t: 'death', id: target.id, by: p.id });
-        log(`room ${room.code}: ${p.id} eliminated ${target.id}`);
+        room.broadcast({ t: 'roundReset', round: room.round, roamMs: 3000, countdownMs: 5000 });
+        log(`room ${room.code}: ${p.id} eliminated ${target.id}; round ${room.round} reset scheduled`);
       }
       room.broadcast({ t: 'health', id: target.id, hp: target.hp, alive: target.alive });
       room.broadcast({ t: 'playerList', players: room.playerList() });
@@ -350,7 +361,11 @@ function handle(p, msg) {
     case 'respawn': {
       const room = p.room; if (!room || room.state !== 'match') return;
       const now = Date.now();
-      if (!p.alive) {
+      const roundRespawn = room.mode === 'pvp' && room.roundResetAt > 0 && room.roundResetIds.has(p.id);
+      if (roundRespawn) {
+        // Round flow: 3 s post-kill roam, then 5 s countdown. The server is the final gate.
+        if (now - room.roundResetAt < 7500) return;
+      } else if (!p.alive) {
         if (now - p.diedAt < RESPAWN_MIN_MS) return;
       } else {
         // The client can die locally (co-op enemies, environment) without the server knowing.
@@ -364,6 +379,10 @@ function handle(p, msg) {
       p.x = x; p.y = y; p.z = z; p.lastStateAt = 0; p.badStates = 0;
       room.broadcast({ t: 'respawn', id: p.id, x, y, z });
       room.broadcast({ t: 'health', id: p.id, hp: p.hp, alive: true });
+      if (roundRespawn) {
+        room.roundResetIds.delete(p.id);
+        if (room.roundResetIds.size === 0) { room.roundResetAt = 0; room.roundResetIds.clear(); }
+      }
       break;
     }
     case 'enemyState': {
