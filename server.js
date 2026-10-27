@@ -39,8 +39,14 @@ const WEAPONS = {
   aa12:      { dmg: 10, rate: 0.22,  hs: 1.7,  pel: 8, rng: 32 },
   usp:       { dmg: 38, rate: 0.24,  hs: 2.2,  pel: 1, rng: 78 },
   fiveseven: { dmg: 25, rate: 0.16,  hs: 2.15, pel: 1, rng: 95 },
+  'melee:fists': { dmg: 24, rate: 0.42, hs: 1.5, pel: 1, rng: 3.2 },
+  'melee:knife': { dmg: 42, rate: 0.38, hs: 1.5, pel: 1, rng: 3.5 },
+  'melee:hatchet': { dmg: 55, rate: 0.65, hs: 1.5, pel: 1, rng: 3.5 },
+  'melee:baton': { dmg: 30, rate: 0.48, hs: 1.5, pel: 1, rng: 3.5 },
+  'melee:machete': { dmg: 48, rate: 0.55, hs: 1.5, pel: 1, rng: 3.8 },
+  grenade: { dmg: 260, rate: 1.8, hs: 1, pel: 1, rng: 12 },
 };
-const MAX_BASE_DMG = 80;
+const MAX_BASE_DMG = 260;
 
 function log(...args) { console.log(new Date().toISOString(), ...args); }
 
@@ -86,7 +92,6 @@ class Room {
     this.mode = 'coop';     // 'coop' | 'pvp'
     this.mapId = 0;
     this.lastEnemyStateAt = 0;
-    this.round = 1; this.roundResetAt = 0; this.roundResetIds = new Set();
   }
   broadcast(msg, exceptId) {
     const s = JSON.stringify(msg);
@@ -140,10 +145,31 @@ function safeSend(ws, data) {
 function leaveRoom(p) {
   const room = p.room;
   if (!room) return;
+
+  // Snapshot match state BEFORE removing the departing player. In PvP, the
+  // remaining player wins by forfeit whether the opponent clicks Leave or
+  // the WebSocket closes unexpectedly (tab close, refresh, network drop).
+  const wasActivePvp = room.state === 'match' && room.mode === 'pvp';
+  const remainingBeforeLeave = [...room.players.values()].filter(q => q.id !== p.id);
   room.players.delete(p.id);
   p.room = null;
   p.ready = false;
   log(`player ${p.id} (${p.name}) left room ${room.code}`);
+
+  if (wasActivePvp && remainingBeforeLeave.length === 1) {
+    const winner = remainingBeforeLeave[0];
+    safeSend(winner.ws, {
+      t: 'forfeit',
+      winnerId: winner.id,
+      id: p.id,
+      name: p.name || 'OPPONENT',
+      reason: 'opponent_left'
+    });
+    // End this room's match state so stale match traffic cannot continue.
+    room.state = 'lobby';
+    log(`room ${room.code}: PvP forfeit; ${winner.id} wins because ${p.id} left`);
+  }
+
   if (room.players.size === 0) {
     rooms.delete(room.code);
     log(`room ${room.code} closed (empty)`);
@@ -277,7 +303,6 @@ function handle(p, msg) {
       room.mapId = Number.isInteger(mapId) && mapId >= 0 && mapId < MAP_COUNT ? mapId : 0;
       room.mode = msg.mode === 'pvp' ? 'pvp' : 'coop';
       room.state = 'match';
-      room.round = 1; room.roundResetAt = 0; room.roundResetIds.clear();
       for (const q of room.players.values()) q.resetForMatch();
       room.broadcast({ t: 'startMatch', mapId: room.mapId, mode: room.mode });
       log(`room ${room.code}: ${room.mode} match started on map ${room.mapId} by host ${p.id}`);
@@ -303,7 +328,8 @@ function handle(p, msg) {
       room.broadcast({
         t: 'state', id: p.id, x, y, z, yaw,
         pitch: Number.isFinite(pitch) ? pitch : 0,
-        weapon: typeof msg.weapon === 'string' && WEAPONS[msg.weapon] ? msg.weapon : '',
+        weapon: typeof msg.weapon === 'string' && (WEAPONS[msg.weapon] || msg.weapon.startsWith('melee:')) ? msg.weapon : '',
+        ml: typeof msg.ml === 'string' ? msg.ml.slice(0, 24) : '',
         moving: !!msg.moving, crouch: !!msg.crouch, fire: !!msg.fire,
         hp: p.hp, // server's own value, never the client's self-report
       }, p.id);
@@ -316,43 +342,35 @@ function handle(p, msg) {
       p.lastShotMsgAt = now;
       const { x, y, z, dx, dy, dz } = msg;
       if (!fin(x, y, z, dx, dy, dz) || Math.abs(dx) > 2 || Math.abs(dy) > 2 || Math.abs(dz) > 2) return;
-      room.broadcast({ t: 'shot', id: p.id, x, y, z, dx, dy, dz, weapon: WEAPONS[msg.weapon] ? msg.weapon : '' }, p.id);
+      const wk = typeof msg.weapon === 'string' && (WEAPONS[msg.weapon] || /^(melee:(fists|knife|hatchet|baton|machete)|util:(grenade|smoke|flash))$/.test(msg.weapon)) ? msg.weapon : '';
+      room.broadcast({ t: 'shot', id: p.id, x, y, z, dx, dy, dz, weapon: wk, vx: Number.isFinite(Number(msg.vx)) ? Number(msg.vx) : 0, vz: Number.isFinite(Number(msg.vz)) ? Number(msg.vz) : 0 }, p.id);
       break;
     }
     case 'hit': {
       // The only place player damage is applied. PvP rooms only.
       const room = p.room; if (!room || room.state !== 'match' || room.mode !== 'pvp') return;
-      if (room.roundResetAt) return; // no combat during the post-elimination transition
-      if (!p.alive || msg.targetId === p.id) return;
-      const target = room.players.get(msg.targetId);
+      if (!p.alive || String(msg.targetId) === String(p.id)) return;
+      const target = room.players.get(String(msg.targetId)) || room.players.get(msg.targetId);
       if (!target || !target.alive) return;
       const key = msg.weapon;
-      const grenade = key === 'grenade';
       const w = Object.prototype.hasOwnProperty.call(WEAPONS, key) ? WEAPONS[key] : null;
-      if (!w && !grenade) return;
+      if (!w) return;
       const now = Date.now();
-      // Validate grenade splash against server-known player positions; the client supplies only the falloff damage.
+      // range sanity using the positions this server last received for both players
       if (p.lastStateAt && target.lastStateAt) {
         const d = Math.hypot(p.x - target.x, p.y - target.y, p.z - target.z);
-        if (grenade ? d > 10.5 : d > w.rng * 1.2 + 4) return;
+        if (d > w.rng * 1.2 + 4) return;
       }
-      if (grenade) {
-        if (now - (p.lastGrenadeHitAt || 0) < 250) return;
-        p.lastGrenadeHitAt = now;
-      } else if (!allowShot(p, key, w, now)) return;
+      if (!allowShot(p, key, w, now)) return;
       let dmg = Number(msg.dmg);
       if (!Number.isFinite(dmg) || dmg <= 0) return;
-      dmg = Math.min(dmg, grenade ? 260 : w.dmg * w.hs * 1.15);
+      dmg = Math.min(dmg, w.dmg * w.hs * 1.15);
       target.hp = Math.max(0, target.hp - dmg);
       target.lastDamagedAt = now;
       if (target.hp <= 0) {
         target.alive = false; target.diedAt = now; p.kills++;
-        room.round += 1;
-        room.roundResetAt = now;
-        room.roundResetIds = new Set(room.players.keys());
         room.broadcast({ t: 'death', id: target.id, by: p.id });
-        room.broadcast({ t: 'roundReset', round: room.round, roamMs: 3000, countdownMs: 5000 });
-        log(`room ${room.code}: ${p.id} eliminated ${target.id}; round ${room.round} reset scheduled`);
+        log(`room ${room.code}: ${p.id} eliminated ${target.id}`);
       }
       room.broadcast({ t: 'health', id: target.id, hp: target.hp, alive: target.alive });
       room.broadcast({ t: 'playerList', players: room.playerList() });
@@ -361,11 +379,7 @@ function handle(p, msg) {
     case 'respawn': {
       const room = p.room; if (!room || room.state !== 'match') return;
       const now = Date.now();
-      const roundRespawn = room.mode === 'pvp' && room.roundResetAt > 0 && room.roundResetIds.has(p.id);
-      if (roundRespawn) {
-        // Round flow: 3 s post-kill roam, then 5 s countdown. The server is the final gate.
-        if (now - room.roundResetAt < 7500) return;
-      } else if (!p.alive) {
+      if (!p.alive) {
         if (now - p.diedAt < RESPAWN_MIN_MS) return;
       } else {
         // The client can die locally (co-op enemies, environment) without the server knowing.
@@ -379,10 +393,6 @@ function handle(p, msg) {
       p.x = x; p.y = y; p.z = z; p.lastStateAt = 0; p.badStates = 0;
       room.broadcast({ t: 'respawn', id: p.id, x, y, z });
       room.broadcast({ t: 'health', id: p.id, hp: p.hp, alive: true });
-      if (roundRespawn) {
-        room.roundResetIds.delete(p.id);
-        if (room.roundResetIds.size === 0) { room.roundResetAt = 0; room.roundResetIds.clear(); }
-      }
       break;
     }
     case 'enemyState': {
