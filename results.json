@@ -1,0 +1,391 @@
+{
+ "pass": 64,
+ "fail": 0,
+ "total": 64,
+ "results": [
+  {
+   "grp": "A build",
+   "name": "RC file contains no MINQ1054 string",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "A build",
+   "name": "RC flag F7_PUBLIC_BUILD=true, DEV flag false",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "A build",
+   "name": "no duplicate script ids / duplicate element ids in RC",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "A build",
+   "name": "RC loads with no page errors (stubbed THREE; startup scripts execute)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "A build",
+   "name": "DEV build loads with no page errors",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "A build",
+   "name": "RC: redeem dialog rejects the removed code and grants nothing",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "A build",
+   "name": "RC: GHOST #1 does NOT receive Pro (owner grant disabled)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "A build",
+   "name": "DEV: GHOST #1 receives Pro (grant preserved behind flag)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "A build",
+   "name": "RC: a non-owner name/ID never gets a free grant (DEV build)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "B quests",
+   "name": "exactly 10 daily, 50 weekly, 17 permanent challenges active",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "B quests",
+   "name": "daily/weekly draws have unique ids and are deterministic per period",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "B quests",
+   "name": "a new day re-draws daily quests and keeps weekly + permanent progress",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "B quests",
+   "name": "weekly reset clears weekly only; daily claims/permanent challenge claims survive in ledger/ch",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "B quests",
+   "name": "clock moved BACKWARDS never re-rolls or re-opens earned quests",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "C tracking",
+   "name": "kill: +kills, headshot, weapon-category counters; same enemy never counted twice",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "C tracking",
+   "name": "no progress in training range, when dead, after run end, or from remote co-op hits",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "C tracking",
+   "name": "boss kill counts bosses; waves count once per wave per run; wave_best uses max",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "C tracking",
+   "name": "mission counts only on victory kinds, once per run; training/mp excluded",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "C tracking",
+   "name": "PvP: counted only for pvp matchMode, once per match, win only with fewer deaths than all opponents",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "C tracking",
+   "name": "PvP KILL attribution: no QST hook exists (documented gap) - kills never counted in pvp",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "D claims",
+   "name": "incomplete cannot be claimed; completed can, exactly once; balance exact",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "D claims",
+   "name": "claim of unknown id / wrong category / expired id rejected; balance unchanged",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "D claims",
+   "name": "permanent challenge: claim once, stays completed, persists after reload",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "D claims",
+   "name": "daily progress + balance survive a page refresh",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "E currency",
+   "name": "separate from Gold: quest claims / spends never change PROG.coins",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "E currency",
+   "name": "spend: insufficient funds / invalid prices fail and never charge or go negative",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "E currency",
+   "name": "spend exact balance -> 0, then next spend fails (never negative)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "E currency",
+   "name": "corrupted balances are sanitised (NaN/negative/string/float/huge)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "E currency",
+   "name": "balance persists across reload; Gold untouched",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "E currency",
+   "name": "lobby button/pill shows the balance and the configured name",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "price is 1500 and comes from the single QST config",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "1499 cannot buy; no charge; no Pro",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "1500 buys: exactly 1500 charged once, Pro granted; second attempt = owned, no charge",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "ownership + remaining balance persist after reload; reload does not charge again",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "UI flow: buyPro -> confirmPro x3 rapid clicks charges exactly once",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "UI flow: cancel leaves balance and ownership unchanged",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "existing Pro owner is not charged when \"buying\" again",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "Gold balance never used to buy Pro (Gold-only player cannot purchase)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "Pro-only (track p) rewards cannot be claimed without Pro, even by direct API call; state unchanged",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "after buying Pro the p-track becomes claimable exactly once",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "F pro",
+   "name": "free-track (f) reward claims once without Pro; repeat changes nothing",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "old save (no qc/qs) loads: qc 0, quest state clean, Gold kept",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "corrupt save: qs is a string -> loads without errors, sane values",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "corrupt save: qs is an array -> loads without errors, sane values",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "corrupt save: qs has wrong types -> loads without errors, sane values",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "corrupt save: negative/huge progress -> loads without errors, sane values",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "corrupt save: qc negative -> loads without errors, sane values",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "corrupt save: qc NaN-as-string -> loads without errors, sane values",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "corrupt save: qc fractional -> loads without errors, sane values",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "corrupt save: qc beyond cap -> loads without errors, sane values",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "totally broken profile JSON in storage: game still starts",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "save-code export -> import round-trips qc, Gold and quest state",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "G saves",
+   "name": "KNOWN LIMITATION: a hand-made save code can set qc up to the 1e9 cap (client-side trust)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "H failure",
+   "name": "localStorage.setItem throwing: Pro purchase does not both charge and withhold Pro",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "H failure",
+   "name": "failed save during a quest claim never loses/doubles reward in memory (claim then re-claim)",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "I layout",
+   "name": "quest panel en @ desktop 1280x720: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "I layout",
+   "name": "quest panel en @ small window 800x500: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "I layout",
+   "name": "quest panel en @ mobile portrait 360x640: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "I layout",
+   "name": "quest panel en @ short landscape 640x300: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "I layout",
+   "name": "quest panel ko @ desktop 1280x720: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "I layout",
+   "name": "quest panel ko @ small window 800x500: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "I layout",
+   "name": "quest panel ko @ mobile portrait 360x640: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "I layout",
+   "name": "quest panel ko @ short landscape 640x300: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width",
+   "ok": true,
+   "info": ""
+  },
+  {
+   "grp": "I layout",
+   "name": "fullscreen button (#f7-fullscreen*) still present in RC DOM",
+   "ok": true,
+   "info": ""
+  }
+ ]
+}

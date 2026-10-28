@@ -1,0 +1,11 @@
+PASS opponent dies -> hidden and one death counted
+PASS respawn message WITH coordinates re-shows opponent at that spot, death flag cleared
+FAIL respawn message WITHOUT coordinates still re-shows opponent (was the failure)  -> {"ok":false,"errs":[]}
+FAIL respawn message lost entirely: state hp>0 after 2.5 s re-shows opponent and re-arms death counting  -> {"ok":false,"errs":[]}
+PASS late pre-death state packet (<2.5 s after death) does NOT resurrect
+PASS dead opponent whose state still reports hp<=0 stays hidden even after 10 s
+FAIL second death after a fallback respawn is counted exactly once (no inflation)  -> {"ok":false,"errs":[]}
+PASS no resurrection after the match is over
+PASS opponent that was never dead is unaffected by state updates (no spurious resets)
+PASS health message (alive:false) hides; later respawn shows
+TOTAL 10 PASS 7 FAIL 3

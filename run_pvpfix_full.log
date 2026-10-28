@@ -1,0 +1,66 @@
+PASS A build :: RC file contains no MINQ1054 string
+PASS A build :: RC flag F7_PUBLIC_BUILD=true, DEV flag false
+PASS A build :: no duplicate script ids / duplicate element ids in RC
+PASS A build :: RC loads with no page errors (stubbed THREE; startup scripts execute)
+PASS A build :: DEV build loads with no page errors
+PASS A build :: RC: redeem dialog rejects the removed code and grants nothing
+PASS A build :: RC: GHOST #1 does NOT receive Pro (owner grant disabled)
+PASS A build :: DEV: GHOST #1 receives Pro (grant preserved behind flag)
+PASS A build :: RC: a non-owner name/ID never gets a free grant (DEV build)
+PASS B quests :: exactly 10 daily, 50 weekly, 17 permanent challenges active
+PASS B quests :: daily/weekly draws have unique ids and are deterministic per period
+PASS B quests :: a new day re-draws daily quests and keeps weekly + permanent progress
+PASS B quests :: weekly reset clears weekly only; daily claims/permanent challenge claims survive in ledger/ch
+PASS B quests :: clock moved BACKWARDS never re-rolls or re-opens earned quests
+PASS C tracking :: kill: +kills, headshot, weapon-category counters; same enemy never counted twice
+PASS C tracking :: no progress in training range, when dead, after run end, or from remote co-op hits
+PASS C tracking :: boss kill counts bosses; waves count once per wave per run; wave_best uses max
+PASS C tracking :: mission counts only on victory kinds, once per run; training/mp excluded
+PASS C tracking :: PvP: counted only for pvp matchMode, once per match, win only with fewer deaths than all opponents
+PASS C tracking :: PvP KILL attribution: no QST hook exists (documented gap) - kills never counted in pvp
+PASS D claims :: incomplete cannot be claimed; completed can, exactly once; balance exact
+PASS D claims :: claim of unknown id / wrong category / expired id rejected; balance unchanged
+PASS D claims :: permanent challenge: claim once, stays completed, persists after reload
+PASS D claims :: daily progress + balance survive a page refresh
+PASS E currency :: separate from Gold: quest claims / spends never change PROG.coins
+PASS E currency :: spend: insufficient funds / invalid prices fail and never charge or go negative
+PASS E currency :: spend exact balance -> 0, then next spend fails (never negative)
+PASS E currency :: corrupted balances are sanitised (NaN/negative/string/float/huge)
+PASS E currency :: balance persists across reload; Gold untouched
+PASS E currency :: lobby button/pill shows the balance and the configured name
+PASS F pro :: price is 1500 and comes from the single QST config
+PASS F pro :: 1499 cannot buy; no charge; no Pro
+PASS F pro :: 1500 buys: exactly 1500 charged once, Pro granted; second attempt = owned, no charge
+PASS F pro :: ownership + remaining balance persist after reload; reload does not charge again
+PASS F pro :: UI flow: buyPro -> confirmPro x3 rapid clicks charges exactly once
+PASS F pro :: UI flow: cancel leaves balance and ownership unchanged
+PASS F pro :: existing Pro owner is not charged when "buying" again
+PASS F pro :: Gold balance never used to buy Pro (Gold-only player cannot purchase)
+PASS F pro :: Pro-only (track p) rewards cannot be claimed without Pro, even by direct API call; state unchanged
+PASS F pro :: after buying Pro the p-track becomes claimable exactly once
+PASS F pro :: free-track (f) reward claims once without Pro; repeat changes nothing
+PASS G saves :: old save (no qc/qs) loads: qc 0, quest state clean, Gold kept
+PASS G saves :: corrupt save: qs is a string -> loads without errors, sane values
+PASS G saves :: corrupt save: qs is an array -> loads without errors, sane values
+PASS G saves :: corrupt save: qs has wrong types -> loads without errors, sane values
+PASS G saves :: corrupt save: negative/huge progress -> loads without errors, sane values
+PASS G saves :: corrupt save: qc negative -> loads without errors, sane values
+PASS G saves :: corrupt save: qc NaN-as-string -> loads without errors, sane values
+PASS G saves :: corrupt save: qc fractional -> loads without errors, sane values
+PASS G saves :: corrupt save: qc beyond cap -> loads without errors, sane values
+PASS G saves :: totally broken profile JSON in storage: game still starts
+PASS G saves :: save-code export -> import round-trips qc, Gold and quest state
+PASS G saves :: KNOWN LIMITATION: a hand-made save code can set qc up to the 1e9 cap (client-side trust)
+PASS H failure :: localStorage.setItem throwing: Pro purchase does not both charge and withhold Pro
+PASS H failure :: failed save during a quest claim never loses/doubles reward in memory (claim then re-claim)
+PASS I layout :: quest panel en @ desktop 1280x720: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width
+PASS I layout :: quest panel en @ small window 800x500: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width
+PASS I layout :: quest panel en @ mobile portrait 360x640: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width
+PASS I layout :: quest panel en @ short landscape 640x300: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width
+PASS I layout :: quest panel ko @ desktop 1280x720: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width
+PASS I layout :: quest panel ko @ small window 800x500: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width
+PASS I layout :: quest panel ko @ mobile portrait 360x640: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width
+PASS I layout :: quest panel ko @ short landscape 640x300: 10/50/17 rows, no horizontal overflow, panel scrolls, claim buttons within viewport width
+PASS I layout :: fullscreen button (#f7-fullscreen*) still present in RC DOM
+
+TOTAL 64  PASS 64  FAIL 0
